@@ -37,7 +37,7 @@ def to_bool(answer, default):
     answer = str(answer).lower()
     default = str(default).lower()
 
-    if answer and (answer in "yes" or answer in default):
+    if answer and answer in "yes":
         return True
 
     return False

@@ -6,18 +6,13 @@ import subprocess
 import inspect
 import pyprov.console
 import argparse
+import traceback
 
 
 class Runner:
     """
     This class runs all added recipes
     """
-
-    config_path = 'config/'
-    """ Path to config folder. """
-
-    data_path = 'data/'
-    """ Path to data folder """
 
     def __init__(self):
         self._recipes = []
@@ -31,7 +26,7 @@ class Runner:
         # Check for recipes folder
         recipe_path = os.path.join(os.getcwd(), 'recipes')
         if not os.path.isdir(recipe_path):
-            raise Exception("No recipes directory found!")
+            raise PyProvException("No recipes directory found!")
 
         # Check for recipes __init__.py file and create it if not present
         recipes_init_file = os.path.join(recipe_path, '__init__.py')
@@ -53,8 +48,6 @@ class Runner:
                                            help="Auto confirm on questions", action="store_true")
             self._args_parser.add_argument('-r', '--recipe',
                                            help="Run single recipe", type=str, metavar="recipe_name")
-            self._args_parser.add_argument('-c', '--config_path',
-                                           help="Path to config files", type=str, metavar='/path')
             self._args_parser.add_argument('-s', '--suite',
                                            help="Path to suite file", type=str, metavar='/path')
             self._args_parser.add_argument('-v', '--verbose',
@@ -76,11 +69,6 @@ class Runner:
 
     def _prepare(self):
         self._arguments = self.arguments_parser.parse_args()
-
-        if self.arguments.config_path:
-            Runner.config_path = self.arguments.config_path
-
-        assert os.path.isdir(Runner.config_path), "Config path '%s' not found." % Runner.config_path
 
         if self.arguments.suite:
             self._prepare_suite()
@@ -115,8 +103,8 @@ class Runner:
                 needed = inspect.getargspec(recipe_class.__init__).args[1:]
                 got = recipe_arguments
                 missing = list(set(needed) - set(got))
-                raise Exception("Wrong recipe params. Params needed: %s. Missing: %s" %
-                                (str(', ').join(needed), str(', ').join(missing)))
+                raise PyProvException("Wrong recipe arguments. Arguments needed: %s. Missing: %s" %
+                                      (str(', ').join(needed), str(', ').join(missing)))
 
     def _prepare_single_recipe(self):
         package_name = self.arguments.recipe.split('.')[0]
@@ -143,8 +131,8 @@ class Runner:
             needed = inspect.getargspec(recipe_class.__init__).args[1:]
             got = recipe_arguments
             missing = list(set(needed) - set(got))
-            raise Exception("Wrong recipe params. Params needed: %s. Missing: %s" %
-                            (str(', ').join(needed), str(', ').join(missing)))
+            raise PyProvException("Wrong recipe arguments. Arguments needed: %s. Missing: %s" %
+                                  (str(', ').join(needed), str(', ').join(missing)))
 
     def run(self):
         """ Starts recipes execution. """
@@ -161,6 +149,9 @@ class Runner:
             if run_recipe:
                 recipe.run(self, self.arguments)
 
+        if self.arguments.verbose:
+            pyprov.console.out('Thanks for using pyprov. Support this project at https://github.com/avladev/pyprov')
+
     def call(self, command):
         """
         @command: str
@@ -169,7 +160,12 @@ class Runner:
         if self.arguments.verbose:
             pyprov.console.out('[Call] ', command)
 
-        return subprocess.call(command, shell=True, stdout=sys.stdout, stdin=sys.stdin, stderr=sys.stderr)
+        code = subprocess.call(command, shell=True, stdout=sys.stdout, stdin=sys.stdin, stderr=sys.stderr)
+
+        if code:
+            raise PyProvException("Unsuccessful system call '%s'" % command)
+
+        return code
 
 
 class Recipe:
@@ -195,15 +191,14 @@ class Recipe:
     def settings(self):
         """
         Loads the recipe settings file which is locate in:
-        config_path/{recipe_package}.ini
+        ./settings/{recipe_package}.ini
         """
-        config_file = Runner.config_path + '/' + self.package + '.ini'
+        settings_file = os.path.join(os.getcwd(), 'settings', self.package + '.ini')
 
         # Loads the settings file once.
-        if (not hasattr(self, '_settings') or self._settings is None) and os.path.isfile(config_file):
-
+        if (not hasattr(self, '_settings') or self._settings is None) and os.path.isfile(settings_file):
             config = ConfigParser.ConfigParser()
-            config.read(config_file)
+            config.read(settings_file)
 
             settings = dict(config._sections)
             for key in settings:
@@ -224,14 +219,14 @@ class Recipe:
         The key is the setting name and the value is the setting comment.
         returns dict
         """
-        raise Exception("Property 'settings_keys' should be defined in recipe '%s'." % self.name)
+        raise PyProvException("Property 'settings_keys' should be defined in recipe '%s'." % self.name)
 
     def run(self, runner, arguments=None):
         """
         This method is executed when recipe is run.
         Each recipe should override this method.
         """
-        raise Exception("Method 'run' not implemented in recipe.")
+        raise PyProvException("Method 'run' not implemented in recipe.")
 
 
 class SettingsDict(dict):
@@ -242,8 +237,12 @@ class SettingsDict(dict):
 
     def get(self, k, d=None):
         if self.recipe.settings_keys.get(k) is None:
-            raise Exception("No key '%s' defined in recipe '%s.%s' settings_keys dict!" %
-                           (k, self.recipe.package, self.recipe.name))
+            raise PyProvException("No key '%s' defined in recipe '%s.%s' settings_keys dict!" %
+                                  (k, self.recipe.package, self.recipe.name))
+
+        if not k in self:
+            raise PyProvException("No key '%s' defined in './settings/%s.ini'" %
+                                  (k, self.recipe.package))
 
         return Variables.replace(dict.get(self, k, d))
 
@@ -348,20 +347,19 @@ class Variables:
     _recipes = {}
 
     def __init__(self):
-        raise Exception("This class should not be instantiated!")
-        pass
+        raise PyProvException("This class should not be instantiated!")
 
     @staticmethod
     def replace(string):
         regex = r'\@\{([a-z\.\_\-0-9]+)\}'
-        return re.sub(regex, Variables._replace_variable, string, flags=re.IGNORECASE)
+        return re.sub(regex, Variables._replace_variable, str(string), flags=re.IGNORECASE)
 
     @staticmethod
     def _replace_variable(match):
         parts = match.group(1).split('.')
 
         if len(parts) < 3:
-            raise Exception("Invalid variable '%s'!" % match.group(0))
+            raise PyProvException("Invalid variable '%s'!" % match.group(0))
 
         module, recipe_name, variable = parts
         cache_key = module + '.' + recipe_name
@@ -398,12 +396,19 @@ def import_recipe(package_name, recipe_name, source=None, line=None):
 
         return recipe_class
 
-    except ImportError:
-        raise Exception("Module not found for recipe '%s'. File '%s' line %s." % (recipe_name, source, line))
+    except ImportError as e:
+        raise PyProvException("Error loading package for recipe '%s.%s'. File '%s' line %s.\n"
+                              "%s" % (package_name, recipe_name, source, line, traceback.format_exc()))
     except AttributeError:
         # missing recipe module or class
-        raise Exception("Recipe '%s' not found. File '%s' line %s." % (recipe_name, source, line))
+        raise PyProvException("Recipe '%s' not found. File '%s' line %s." %
+                              (recipe_name, source, line))
 
+
+class PyProvException(Exception):
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
 
 def exception_handler(exctype, value, traceback):
     """
@@ -413,7 +418,7 @@ def exception_handler(exctype, value, traceback):
     if exctype == KeyboardInterrupt:
         pyprov.console.out('')  # Adds a new line after Ctrl+C character
         pyprov.console.err('Canceled')
-    elif exctype == AssertionError or exctype == Exception:
+    elif exctype == PyProvException:
         pyprov.console.err('[Error] ', value.message)
         exit()
     else:

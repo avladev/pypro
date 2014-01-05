@@ -20,7 +20,7 @@ setup(
     author = 'Anatoli Vladev',
     author_email = 'avladev@gmail.com',
     packages = ['pyprov'],
-    scripts = ['scripts/ppr.py'],
+    scripts = ['ppr.py'],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Environment :: Console',
