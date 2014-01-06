@@ -179,7 +179,7 @@ class ProcessRunner:
     @staticmethod
     def _capture_output(process, field, output_file=None):
         while True and getattr(process, field):
-            data = getattr(process, field).read(1024)
+            data = getattr(process, field).read(16)
 
             if data == '':
                 break
