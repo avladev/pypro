@@ -2,6 +2,6 @@
 README.md
 ppr.py
 setup.py
-pyprov\__init__.py
-pyprov\console.py
-pyprov\core.py
+pypro\__init__.py
+pypro\console.py
+pypro\core.py

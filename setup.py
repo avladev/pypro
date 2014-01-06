@@ -11,15 +11,15 @@ except:
     long_description = description
 
 setup(
-    name = "pyprov",
+    name = "pypro",
     version = version,
-    url = 'https://github.com/avladev/pyprov',
+    url = 'https://github.com/avladev/pypro',
     license = 'MIT',
     description = description,
     long_description = long_description,
     author = 'Anatoli Vladev',
     author_email = 'avladev@gmail.com',
-    packages = ['pyprov'],
+    packages = ['pypro'],
     scripts = ['ppr.py'],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',

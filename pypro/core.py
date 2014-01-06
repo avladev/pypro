@@ -4,10 +4,15 @@ import os
 import sys
 import subprocess
 import inspect
-import pyprov.console
+import pypro.console
 import argparse
 import traceback
+import threading
+import tempfile
+import time
 
+version = '0.1.1'
+release = version + '.alpha'
 
 class Runner:
     """
@@ -26,7 +31,7 @@ class Runner:
         # Check for recipes folder
         recipe_path = os.path.join(os.getcwd(), 'recipes')
         if not os.path.isdir(recipe_path):
-            raise PyProvException("No recipes directory found!")
+            raise PyproException("No recipes directory found!")
 
         # Check for recipes __init__.py file and create it if not present
         recipes_init_file = os.path.join(recipe_path, '__init__.py')
@@ -103,7 +108,7 @@ class Runner:
                 needed = inspect.getargspec(recipe_class.__init__).args[1:]
                 got = recipe_arguments
                 missing = list(set(needed) - set(got))
-                raise PyProvException("Wrong recipe arguments. Arguments needed: %s. Missing: %s" %
+                raise PyproException("Wrong recipe arguments. Arguments needed: %s. Missing: %s" %
                                       (str(', ').join(needed), str(', ').join(missing)))
 
     def _prepare_single_recipe(self):
@@ -131,7 +136,7 @@ class Runner:
             needed = inspect.getargspec(recipe_class.__init__).args[1:]
             got = recipe_arguments
             missing = list(set(needed) - set(got))
-            raise PyProvException("Wrong recipe arguments. Arguments needed: %s. Missing: %s" %
+            raise PyproException("Wrong recipe arguments. Arguments needed: %s. Missing: %s" %
                                   (str(', ').join(needed), str(', ').join(missing)))
 
     def run(self):
@@ -144,13 +149,13 @@ class Runner:
 
             # Ask user whether to run current recipe if -y argument is not specified
             if not self.arguments.yes:
-                run_recipe = pyprov.console.ask_bool('Run %s.%s' % (recipe.package, recipe.name), "yes")
+                run_recipe = pypro.console.ask_bool('Run %s.%s' % (recipe.package, recipe.name), "yes")
 
             if run_recipe:
                 recipe.run(self, self.arguments)
 
         if self.arguments.verbose:
-            pyprov.console.out('Thanks for using pyprov. Support this project at https://github.com/avladev/pyprov')
+            pypro.console.out('Thanks for using pypro. Support this project at https://github.com/avladev/pypro')
 
     def call(self, command):
         """
@@ -158,14 +163,51 @@ class Runner:
         Executes shell command.
         """
         if self.arguments.verbose:
-            pyprov.console.out('[Call] ', command)
+            pypro.console.out('[Call] ', command)
 
-        code = subprocess.call(command, shell=True, stdout=sys.stdout, stdin=sys.stdin, stderr=sys.stderr)
+        #code = subprocess.call(command, shell=True, stdout=sys.stdout, stdin=sys.stdin, stderr=sys.stderr)
+        code, output = ProcessRunner.run(command)
 
         if code:
-            raise PyProvException("Unsuccessful system call '%s'" % command)
+            raise PyproException("Unsuccessful system call '%s'" % command)
 
-        return code
+        return output
+
+
+class ProcessRunner:
+
+    @staticmethod
+    def _capture_output(process, field, output_file=None):
+        while True and getattr(process, field):
+            data = getattr(process, field).read(1024)
+
+            if data == '':
+                break
+
+            sys.stdout.write(data)
+            sys.stdout.flush()
+
+            if output_file:
+                output_file.write(data)
+                output_file.flush()
+
+            time.sleep(0.001)
+
+    @staticmethod
+    def run(command):
+        output_file = tempfile.TemporaryFile()
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stdin=sys.stdin, bufsize=0)
+
+        output_thread = threading.Thread(target=ProcessRunner._capture_output, args=(process, 'stdout', output_file))
+        output_thread.run()
+
+        input_thread = threading.Thread(target=ProcessRunner._capture_output, args=(process, 'stdin'))
+        input_thread.run()
+
+        process.wait()
+        output_file.seek(0)
+
+        return process.returncode, output_file.read()
 
 
 class Recipe:
@@ -219,14 +261,14 @@ class Recipe:
         The key is the setting name and the value is the setting comment.
         returns dict
         """
-        raise PyProvException("Property 'settings_keys' should be defined in recipe '%s'." % self.name)
+        raise PyproException("Property 'settings_keys' should be defined in recipe '%s'." % self.name)
 
     def run(self, runner, arguments=None):
         """
         This method is executed when recipe is run.
         Each recipe should override this method.
         """
-        raise PyProvException("Method 'run' not implemented in recipe.")
+        raise PyproException("Method 'run' not implemented in recipe.")
 
 
 class SettingsDict(dict):
@@ -237,11 +279,11 @@ class SettingsDict(dict):
 
     def get(self, k, d=None):
         if self.recipe.settings_keys.get(k) is None:
-            raise PyProvException("No key '%s' defined in recipe '%s.%s' settings_keys dict!" %
+            raise PyproException("No key '%s' defined in recipe '%s.%s' settings_keys dict!" %
                                   (k, self.recipe.package, self.recipe.name))
 
         if not k in self:
-            raise PyProvException("No key '%s' defined in './settings/%s.ini'" %
+            raise PyproException("No key '%s' defined in './settings/%s.ini'" %
                                   (k, self.recipe.package))
 
         return Variables.replace(dict.get(self, k, d))
@@ -334,7 +376,7 @@ class Parser:
             if not part or part == '=':
                 continue
 
-            if part[0] in ["'", "'"] and part[-1] in ["'", '"']:
+            if part[0] in ["'", '"'] and part[-1] in ["'", '"']:
                 part = part[1:-1]
 
             filtered.append(part)
@@ -347,7 +389,7 @@ class Variables:
     _recipes = {}
 
     def __init__(self):
-        raise PyProvException("This class should not be instantiated!")
+        raise PyproException("This class should not be instantiated!")
 
     @staticmethod
     def replace(string):
@@ -359,7 +401,7 @@ class Variables:
         parts = match.group(1).split('.')
 
         if len(parts) < 3:
-            raise PyProvException("Invalid variable '%s'!" % match.group(0))
+            raise PyproException("Invalid variable '%s'!" % match.group(0))
 
         module, recipe_name, variable = parts
         cache_key = module + '.' + recipe_name
@@ -397,15 +439,15 @@ def import_recipe(package_name, recipe_name, source=None, line=None):
         return recipe_class
 
     except ImportError as e:
-        raise PyProvException("Error loading package for recipe '%s.%s'. File '%s' line %s.\n"
-                              "%s" % (package_name, recipe_name, source, line, traceback.format_exc()))
+        raise PyproException("Error loading package for recipe '%s.%s'. File '%s' line %s.\n"
+                             "%s" % (package_name, recipe_name, source, line, traceback.format_exc()))
     except AttributeError:
         # missing recipe module or class
-        raise PyProvException("Recipe '%s' not found. File '%s' line %s." %
-                              (recipe_name, source, line))
+        raise PyproException("Recipe '%s' not found. File '%s' line %s." %
+                             (recipe_name, source, line))
 
 
-class PyProvException(Exception):
+class PyproException(Exception):
 
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
@@ -416,10 +458,10 @@ def exception_handler(exctype, value, traceback):
     also stops the Runner in case of an error.
     """
     if exctype == KeyboardInterrupt:
-        pyprov.console.out('')  # Adds a new line after Ctrl+C character
-        pyprov.console.err('Canceled')
-    elif exctype == PyProvException:
-        pyprov.console.err('[Error] ', value.message)
+        pypro.console.out('')  # Adds a new line after Ctrl+C character
+        pypro.console.err('Canceled')
+    elif exctype == PyproException:
+        pypro.console.err('[Error] ', value.message)
         exit()
     else:
         sys.__excepthook__(exctype, value, traceback)

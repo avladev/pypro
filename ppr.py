@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import pyprov.core
+import pypro.core
 
-runner = pyprov.core.Runner()
+runner = pypro.core.Runner()
 runner.run()
