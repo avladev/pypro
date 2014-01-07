@@ -1,0 +1,36 @@
+# General stuff
+---------------
+
+    * Check we are with root privileges
+    utils.CheckRoot
+
+    * Update APT
+    utils.UpdateAPT
+
+# Install dependencies
+----------------------
+
+    * Install web.py framework
+    dependencies.InstallWebPy
+
+    * Install MySQL server
+    mysql.Install
+
+    * Install MySQLdb support for python
+    dependencies.InstallMySQLdb
+
+
+# Setup project
+---------------
+
+    * Create database schema
+    mysql.ExecuteSQL file=./data/db.sql database=@{config.db.db_name} username=root password=@{mysql.install.root_password}
+
+    * Create database user
+    mysql.Grant database=@{config.db.db_name} username=@{config.db.username} password=@{config.db.password}
+
+    * Create config file
+    project.CreateConfig source=./data/config.py destination=../todo/config.py
+
+
+

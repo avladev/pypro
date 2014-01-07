@@ -1,0 +1,3 @@
+include ppr.py
+include README.md
+recursive-include pypro/ *

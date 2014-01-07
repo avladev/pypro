@@ -34,3 +34,13 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+# PyCharm
+.idea
+
+# Vagrant
+.vagrant
+
+
+# Project
+examples/vagrant_todo/todo/config.py

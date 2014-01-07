@@ -1,0 +1,25 @@
+# Call without arguments, settings or notations
+-----------------------------------------------
+    * Prints: Hello world!
+    hello_world.HelloWorld
+
+
+# Call with argument
+--------------------
+    * Prints: Hello programmer!
+    hello_argument.HelloArgument what=programmer
+
+
+# Call with settings
+--------------------
+    * Prints: Hello from .ini file HelloSettings section!
+    hello_settings.HelloSettings
+
+
+# Call with notation
+--------------------
+    * Prints: Hello from .ini file HelloSettings section!
+    hello_argument.HelloArgument what=@{hello_settings.HelloSettings.what}
+
+
+hello_argument.HelloArgument what="programmer. Thanks for finishing this tutorial. I wish you success"
