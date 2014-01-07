@@ -40,3 +40,7 @@ nosetests.xml
 
 # Vagrant
 .vagrant
+
+
+# Project
+examples/vagrant_todo/todo/config.py
