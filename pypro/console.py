@@ -1,6 +1,10 @@
 import os
 import sys
 
+if sys.version_info[0] == 3:
+    def raw_input(prompt):
+        return input(prompt).rstrip("\n")
+
 
 def ask(question, default=None):
     """

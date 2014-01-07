@@ -1,4 +1,4 @@
-import ConfigParser
+from __future__ import print_function
 import re
 import os
 import sys
@@ -10,6 +10,11 @@ import traceback
 import threading
 import tempfile
 import time
+
+try:
+    import ConfigParser
+except ImportError:
+    import configparser as ConfigParser
 
 version = '0.1.1'
 release = version + '.alpha'
@@ -149,7 +154,7 @@ class Runner:
 
             # Ask user whether to run current recipe if -y argument is not specified
             if not self.arguments.yes:
-                run_recipe = pypro.console.ask_bool('Run %s.%s' % (recipe.package, recipe.name), "yes")
+                run_recipe = pypro.console.ask_bool('Run %s.%s' % (recipe.module, recipe.name), "yes")
 
             if run_recipe:
                 recipe.run(self, self.arguments)
@@ -214,20 +219,27 @@ class Recipe:
     """ This class represents a given task called "recipe". """
     def __init__(self):
         self._settings = None
+        self.settings_keys = {}
         pass
 
     @property
     def name(self):
         """ Returns the recipe name which is its class name without package. """
-        return str(self.__class__).split('.')[-1].lower()
+        if not hasattr(self, '_name'):
+            self._name = re.search('[a-z]+\.([a-z]+)\.([a-z]+)', str(self.__class__), re.IGNORECASE).group(2)
+
+        return self._name
 
     @property
-    def package(self):
+    def module(self):
         """
-        Returns the package name of Recipe.
+        Returns the module name of Recipe.
         This actually represents the file basename of a recipe.
         """
-        return str(self.__class__).split('.')[-2].lower()
+        if not hasattr(self, '_module'):
+            self._module = re.search('[a-z]+\.([a-z]+)\.([a-z]+)', str(self.__class__), re.IGNORECASE).group(1)
+
+        return self._module
 
     @property
     def settings(self):
@@ -235,7 +247,7 @@ class Recipe:
         Loads the recipe settings file which is locate in:
         ./settings/{recipe_package}.ini
         """
-        settings_file = os.path.join(os.getcwd(), 'settings', self.package + '.ini')
+        settings_file = os.path.join(os.getcwd(), 'settings', self.module.lower() + '.ini')
 
         # Loads the settings file once.
         if (not hasattr(self, '_settings') or self._settings is None) and os.path.isfile(settings_file):
@@ -247,21 +259,12 @@ class Recipe:
                 settings[key] = dict(config.defaults(), **settings[key])
                 settings[key].pop('__name__', None)
 
-            self._settings = SettingsDict(self, settings.get(str(self.__class__).split('.')[-1], {}))
+            self._settings = SettingsDict(self, settings.get(self.name, {}))
 
         elif not hasattr(self, '_settings'):
             self._settings = SettingsDict(self, {})
 
         return self._settings
-
-    @property
-    def settings_keys(self):
-        """
-        Settings keys have to be defined in this dict in order to be accessed.
-        The key is the setting name and the value is the setting comment.
-        returns dict
-        """
-        raise PyproException("Property 'settings_keys' should be defined in recipe '%s'." % self.name)
 
     def run(self, runner, arguments=None):
         """
@@ -278,13 +281,13 @@ class SettingsDict(dict):
         self.recipe = recipe
 
     def get(self, k, d=None):
-        if self.recipe.settings_keys.get(k) is None:
+        if not k in self.recipe.settings_keys:
             raise PyproException("No key '%s' defined in recipe '%s.%s' settings_keys dict!" %
-                                  (k, self.recipe.package, self.recipe.name))
+                                 (k, self.recipe.module, self.recipe.name))
 
         if not k in self:
             raise PyproException("No key '%s' defined in './settings/%s.ini'" %
-                                  (k, self.recipe.package))
+                                 (k, self.recipe.module))
 
         return Variables.replace(dict.get(self, k, d))
 

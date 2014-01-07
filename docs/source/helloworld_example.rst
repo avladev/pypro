@@ -1,7 +1,11 @@
+.. _tutorial:
+
 Hello world example
 ===================
 
 .. toctree::
+    :hidden:
+    helloworld_example
 
 Before we can begin you need the https://github.com/avladev/pypro/examples/helloworld folder somewhere on you drive.
 
@@ -140,7 +144,7 @@ You can also use this notation as part of ``HelloArgument`` ``what`` argument me
     ppr.py -r hello_argument.HelloArgument what="the HelloSettings.what contains: \"@{hello_settings.HelloSettings.what}\""
 
 This feature is very useful when you have an global configuration for your project. For example you can create
-an module called ``config`` and recipes ``DB``, ``WebProject`` and define their ``self.settings_keys`` dicts and
+an module called ``config`` and recipes ``DB``, ``MyProject`` and define their ``self.settings_keys`` dicts and
 then you can reference this settings from all of your recipes. For example if you have recipe for executing sql
 queries you can do::
 
