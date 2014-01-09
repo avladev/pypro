@@ -157,6 +157,7 @@ class Runner:
                 run_recipe = pypro.console.ask_bool('Run %s.%s' % (recipe.module, recipe.name), "yes")
 
             if run_recipe:
+                pypro.console.out('Running %s.%s' % (recipe.module, recipe.name))
                 recipe.run(self, self.arguments)
 
         if self.arguments.verbose:
@@ -184,7 +185,7 @@ class ProcessRunner:
     @staticmethod
     def _capture_output(process, field, output_file=None):
         while True and getattr(process, field):
-            data = getattr(process, field).read(1024)
+            data = getattr(process, field).read(1)
 
             if data == '':
                 break
@@ -196,8 +197,6 @@ class ProcessRunner:
                 output_file.write(data)
                 output_file.flush()
 
-            time.sleep(0.001)
-
     @staticmethod
     def run(command):
         output_file = tempfile.TemporaryFile()
@@ -205,9 +204,6 @@ class ProcessRunner:
 
         output_thread = threading.Thread(target=ProcessRunner._capture_output, args=(process, 'stdout', output_file))
         output_thread.run()
-
-        input_thread = threading.Thread(target=ProcessRunner._capture_output, args=(process, 'stdin'))
-        input_thread.run()
 
         process.wait()
         output_file.seek(0)
